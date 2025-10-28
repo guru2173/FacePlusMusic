@@ -1,4 +1,3 @@
-# Core
 streamlit==1.38.0
 opencv-python-headless==4.10.0.84
 pandas==2.2.3
@@ -6,17 +5,13 @@ numpy==1.26.4
 Pillow==10.4.0
 matplotlib==3.9.2
 
-# Deep learning – compatible with Python 3.10–3.12
-tensorflow==2.16.1
-keras==3.4.1
+# DeepFace (auto-installs keras and torch backends)
+deepface==0.0.93
+
+# Torch (CPU-compatible)
 torch==2.5.1
 torchvision==0.20.1
 
-# Emotion detection
-deepface==0.0.93
-
-# Optional helpers
-protobuf==4.25.3
 
 
 
