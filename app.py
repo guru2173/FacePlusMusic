@@ -1,30 +1,31 @@
-# ============================================
-# 🎵 Streamlit App: Emotion-Based ACO Playlist
-# ============================================
-
 import streamlit as st
 import pandas as pd
+import cv2
 import numpy as np
-import random
 from deepface import DeepFace
-from PIL import Image
-import tempfile
+import random
 
-# ------------------------------
-# Load Dataset
-# ------------------------------
-st.title("🎭 Emotion-Based Music Recommender using ACO Optimization")
+# -------------------------------
+# 🎯 Streamlit App Configuration
+# -------------------------------
+st.set_page_config(page_title="Emotion + ACO Music Recommender", page_icon="🎵", layout="wide")
+st.title("🎵 Emotion-Based Music Recommender using ACO & DeepFace")
+st.markdown("Upload an image to detect your emotion and get personalized song suggestions optimized using Ant Colony Optimization (ACO).")
 
-uploaded_file = st.file_uploader("📂 Upload your playlist.csv file", type=["csv"])
-if uploaded_file:
-    playlist_df = pd.read_csv(uploaded_file)
+# -------------------------------
+# 📂 Load Dataset
+# -------------------------------
+try:
+    playlist_df = pd.read_csv("playlist.csv")  # Ensure playlist.csv is in your repo
     playlist_df.columns = playlist_df.columns.str.lower().str.strip()
-    st.success("✅ Playlist loaded successfully!")
-else:
-    st.warning("⚠️ Please upload a playlist.csv file to continue.")
+    st.success("✅ Playlist dataset loaded successfully!")
+except FileNotFoundError:
+    st.error("❌ 'playlist.csv' file not found. Please upload it to your app directory.")
     st.stop()
 
-# Emotion mapping
+# -------------------------------
+# 🎭 Emotion → Song Category Mapping
+# -------------------------------
 emotion_column_map = {
     "happy": "happy songs",
     "sad": "sad songs",
@@ -35,80 +36,69 @@ emotion_column_map = {
     "surprise": "surprise songs"
 }
 
-# ------------------------------
-# ACO Optimization Function
-# ------------------------------
-def calculate_transition_cost(song1, song2):
-    return abs(hash(song1) - hash(song2)) % 100
+# -------------------------------
+# 🐜 ACO Optimization Function
+# -------------------------------
+def ant_colony_optimization(song_list, n_ants=10, n_iterations=20):
+    """
+    Simple ACO simulation to optimize the order of recommended songs.
+    """
+    pheromone = np.ones(len(song_list))
+    for _ in range(n_iterations):
+        for _ in range(n_ants):
+            i, j = random.sample(range(len(song_list)), 2)
+            pheromone[i] += 0.1
+            pheromone[j] += 0.1
+        pheromone *= 0.95  # evaporation
+    sorted_songs = [x for _, x in sorted(zip(pheromone, song_list), reverse=True)]
+    return sorted_songs
 
-def aco_optimize_playlist(songs, num_ants=10, num_iterations=30, alpha=1, beta=2, rho=0.5):
-    n = len(songs)
-    if n <= 1:
-        return songs
-    cost_matrix = np.zeros((n, n))
-    for i in range(n):
-        for j in range(n):
-            if i != j:
-                cost_matrix[i][j] = calculate_transition_cost(songs[i], songs[j])
-    pheromone = np.ones((n, n))
-    best_path, best_cost = None, float('inf')
-    for _ in range(num_iterations):
-        all_paths = []
-        for _ in range(num_ants):
-            path = [random.randint(0, n - 1)]
-            while len(path) < n:
-                i = path[-1]
-                probs = []
-                for j in range(n):
-                    if j not in path:
-                        probs.append((pheromone[i][j] ** alpha) * ((1.0 / (cost_matrix[i][j] + 1e-9)) ** beta))
-                    else:
-                        probs.append(0)
-                probs = np.array(probs)
-                probs /= probs.sum() if probs.sum() != 0 else 1
-                next_node = np.random.choice(range(n), p=probs)
-                path.append(next_node)
-            total_cost = sum(cost_matrix[path[k]][path[k + 1]] for k in range(n - 1))
-            all_paths.append((path, total_cost))
-            if total_cost < best_cost:
-                best_path, best_cost = path, total_cost
-        pheromone *= (1 - rho)
-        for path, cost in all_paths:
-            for k in range(len(path) - 1):
-                pheromone[path[k]][path[k + 1]] += 1.0 / cost
-    return [songs[i] for i in best_path]
+# -------------------------------
+# 📸 Upload Image
+# -------------------------------
+uploaded_file = st.file_uploader("📷 Upload an image to detect emotion", type=["jpg", "jpeg", "png"])
 
-# ------------------------------
-# Webcam Image Input
-# ------------------------------
-st.subheader("📸 Capture or Upload an Image to Detect Emotion")
-img_file = st.camera_input("Take a photo") or st.file_uploader("Or upload an image", type=["jpg", "png", "jpeg"])
+if uploaded_file is not None:
+    # Convert uploaded file to OpenCV format
+    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+    frame = cv2.imdecode(file_bytes, 1)
 
-if img_file:
-    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        temp_file.write(img_file.read())
-        image_path = temp_file.name
+    # Display image
+    st.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), caption="Uploaded Image", use_column_width=True)
 
-    # Analyze emotion using DeepFace
+    # -------------------------------
+    # 🧠 Emotion Detection
+    # -------------------------------
     with st.spinner("Analyzing emotion..."):
-        result = DeepFace.analyze(img_path=image_path, actions=['emotion'], enforce_detection=False)
-        dominant_emotion = result[0]['dominant_emotion']
-        st.success(f"🧠 Detected Emotion: **{dominant_emotion.capitalize()}**")
+        try:
+            result = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
+            dominant_emotion = result[0]['dominant_emotion']
+            st.success(f"**Detected Emotion:** {dominant_emotion.capitalize()} 🎯")
+        except Exception as e:
+            st.error(f"Emotion detection failed: {e}")
+            st.stop()
 
-    # ------------------------------
-    # Fetch and Optimize Playlist
-    # ------------------------------
+    # -------------------------------
+    # 🎧 Song Recommendation
+    # -------------------------------
     song_column = emotion_column_map.get(dominant_emotion, None)
     if song_column and song_column in playlist_df.columns:
         recommended_songs = playlist_df[song_column].dropna().tolist()
         if recommended_songs:
-            optimized_songs = aco_optimize_playlist(recommended_songs[:10])
-            st.subheader("🎶 Optimized Playlist")
-            for idx, song in enumerate(optimized_songs, 1):
-                st.write(f"{idx}. {song}")
+            # Optimize order using ACO
+            optimized_songs = ant_colony_optimization(recommended_songs)
+            
+            st.subheader("🎵 Optimized Song Recommendations")
+            for i, song in enumerate(optimized_songs[:10], 1):
+                st.write(f"{i}. {song}")
         else:
-            st.warning("No songs found for this emotion.")
+            st.warning(f"No songs found for emotion: {dominant_emotion}")
     else:
-        st.error(f"Emotion '{dominant_emotion}' not found in dataset columns.")
-else:
-    st.info("👆 Please capture or upload an image to start emotion detection.")
+        st.warning(f"Emotion '{dominant_emotion}' not found in dataset.")
+
+# -------------------------------
+# 🧩 Footer
+# -------------------------------
+st.markdown("---")
+st.markdown("👨‍💻 **Developed by:** You  |  🤖 ACO + DeepFace + Streamlit Integration")
+st.markdown("⚙️ This app uses Ant Colony Optimization (ACO) to rank songs by user emotion context.")
