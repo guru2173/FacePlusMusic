@@ -10,13 +10,13 @@ import random
 # -------------------------------
 st.set_page_config(page_title="Emotion + ACO Music Recommender", page_icon="🎵", layout="wide")
 st.title("🎵 Emotion-Based Music Recommender using ACO & DeepFace")
-st.markdown("Upload an image to detect your emotion and get personalized song suggestions optimized using Ant Colony Optimization (ACO).")
+st.markdown("Upload an image to detect your emotion and get personalized **Top 5 Song Recommendations** optimized using Ant Colony Optimization (ACO).")
 
 # -------------------------------
 # 📂 Load Dataset
 # -------------------------------
 try:
-    playlist_df = pd.read_csv("playlist.csv")  # Ensure playlist.csv is in your repo
+    playlist_df = pd.read_csv("playlist.csv")
     playlist_df.columns = playlist_df.columns.str.lower().str.strip()
     st.success("✅ Playlist dataset loaded successfully!")
 except FileNotFoundError:
@@ -59,11 +59,9 @@ def ant_colony_optimization(song_list, n_ants=10, n_iterations=20):
 uploaded_file = st.file_uploader("📷 Upload an image to detect emotion", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    # Convert uploaded file to OpenCV format
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
     frame = cv2.imdecode(file_bytes, 1)
 
-    # Display image
     st.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), caption="Uploaded Image", use_column_width=True)
 
     # -------------------------------
@@ -85,12 +83,14 @@ if uploaded_file is not None:
     if song_column and song_column in playlist_df.columns:
         recommended_songs = playlist_df[song_column].dropna().tolist()
         if recommended_songs:
-            # Optimize order using ACO
             optimized_songs = ant_colony_optimization(recommended_songs)
-            
-            st.subheader("🎵 Optimized Song Recommendations")
-            for i, song in enumerate(optimized_songs[:10], 1):
-                st.write(f"{i}. {song}")
+            top_5_songs = optimized_songs[:5]
+
+            st.subheader("🎵 **Top 5 Optimized Song Recommendations**")
+            for i, song in enumerate(top_5_songs, 1):
+                st.markdown(f"**{i}.** 🎶 {song}")
+
+            st.info("💡 These songs were selected using Ant Colony Optimization based on your detected emotion.")
         else:
             st.warning(f"No songs found for emotion: {dominant_emotion}")
     else:
@@ -100,5 +100,4 @@ if uploaded_file is not None:
 # 🧩 Footer
 # -------------------------------
 st.markdown("---")
-st.markdown("👨‍💻 **Developed by:** You  |  🤖 ACO + DeepFace + Streamlit Integration")
-st.markdown("⚙️ This app uses Ant Colony Optimization (ACO) to rank songs by user emotion context.")
+st.markdown("👨‍💻 Developed by: You | 🤖 Powered by ACO + DeepFace + Streamlit")
